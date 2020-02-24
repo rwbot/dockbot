@@ -138,6 +138,11 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/dockbot_node.cpp)
 
+add_executable(basic_controls src/basic_controls.cpp)
+target_link_libraries(basic_controls
+   ${catkin_LIBRARIES}
+)
+
 add_executable(dock_interactive_marker src/dock_interactive_marker.cpp)
 target_link_libraries(dock_interactive_marker
    ${catkin_LIBRARIES}
