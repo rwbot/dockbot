@@ -1,0 +1,15 @@
+dockbot:
+  # Publish all joint states -----------------------------------
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50
+
+  # Position Controllers ---------------------------------------
+  left_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: dock_left_joint
+    pid: {p: 10.0, i: 0.01, d: 10.0}
+  right_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: dock_right_joint
+    pid: {p: 10.0, i: 0.01, d: 10.0}

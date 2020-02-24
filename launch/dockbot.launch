@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<launch>
+
+  <include file="$(find dockbot)/launch/world.launch"/>
+
+      <arg name="x" default="0.0"/>
+      <arg name="y" default="1.0"/>
+      <arg name="z" default="0.0"/>
+
+    <!-- Load the URDF into the ROS Parameter Server -->
+    <!-- Converts XACRO to URDF at launch time and passes it -->
+    <!-- Manual conversion     rosrun xacro xacro model.xacro > model.urdf    -->
+    <param name="robot_description" command="$(find xacro)/xacro '$(find dockbot)/robots/dockbot.urdf.xacro'" />
+
+    <!-- Run a python script to the send a service call to gazebo_ros to spawn a URDF robot -->
+    <!-- <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+    args="-urdf -x $(arg x) -y $(arg y) -z $(arg z)  -model $(arg robot_name) -param robot_description"/> -->
+    <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-urdf  -model dockbot -param robot_description -x $(arg x) -y $(arg y) -z $(arg z)"/>
+
+
+    <arg name="rvizconfig" default="$(find dockbot)/config/dockbot.rviz" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" />
+
+
+
+    <node name="rqt_joint_trajectory_controller" pkg="rqt_joint_trajectory_controller" type="rqt_joint_trajectory_controller" />
+
+
+    <!-- Load joint controller configurations from YAML file to parameter server -->
+    <rosparam file="$(find dockbot)/config/dockbot_control.yaml" command="load"/>
+
+     <node name="controller_spawner" pkg="controller_manager" type="spawner" output="screen"  ns="/dockbot"  args="joint_state_controller left_position_controller right_position_controller"/>
+
+     <!-- <node name="rqt_robot_steering" pkg="rqt_robot_steering" type="rqt_robot_steering">
+         <param name="default_topic" value="dockbot_diff_drive_controller/cmd_vel"/>
+    </node> -->
+
+    <node pkg="robot_state_publisher" type="robot_state_publisher"  name="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="30.0" />
+        <remap from="/joint_states" to="/dockbot/joint_states"/>
+    </node>
+
+    <!-- <node pkg="joint_state_publisher" type="joint_state_publisher"  name="joint_state_publisher">
+        <param name="publish_frequency" type="double" value="30.0" />
+        <param name="use_gui" value="TRUE"/>
+    </node> -->
+
+</launch>

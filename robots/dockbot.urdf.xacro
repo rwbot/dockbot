@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+
+<robot name="dockbot"  xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find dockbot)/urdf/general.urdf.xacro"/>
+    <xacro:include filename="$(find dockbot)/urdf/dock_link.urdf.xacro"/>
+    <xacro:include filename="$(find dockbot)/urdf/dockbot.gazebo" />
+
+
+    <link name="base_footprint"></link>
+    <link name="base_link"></link>
+
+    <link name="dock_base_link">
+        <collision>
+            <xacro:ZERO_ORIGIN/>
+            <xacro:generate_geometry shape="box" x="${DOCK_LENGTH}" y="${DOCK_WIDTH}" z="${DOCK_HEIGHT}"/>
+            <!-- <geometry>
+                <mesh filename="package://dockbot/meshes/dockbot.dae" scale="0.1 0.1 0.1"/>
+            </geometry> -->
+        </collision>
+
+        <visual>
+            <xacro:ZERO_ORIGIN/>
+            <!-- <xacro:generate_geometry shape="box" x="${DOCK_LENGTH}" y="${DOCK_WIDTH}" z="${DOCK_HEIGHT}"/> -->
+            <geometry>
+                <mesh filename="package://dockbot/meshes/dockbot.dae" scale="0.1 0.1 0.1"/>
+            </geometry>
+        </visual>
+
+        <xacro:ONE_INERTIAL/>
+    </link>
+
+    <joint type="fixed" name="footprint_base_joint">
+        <xacro:ZERO_ORIGIN/>
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+    </joint>
+
+    <joint type="fixed" name="base_dock_joint">
+        <xacro:ZERO_ORIGIN/>
+        <parent link="base_link"/>
+        <child link="dock_base_link"/>
+    </joint>
+
+    <gazebo reference="dock_base_link">
+         <mu1 value="${DOCK_MU1}"/>
+         <mu2 value="${DOCK_MU2}"/>
+         <kp value="${DOCK_KP}"/>
+         <kd value="${DOCK_KD}"/>
+         <material>Gazebo/Yellow</material>
+   </gazebo>
+
+
+    <xacro:generate_dock side="left"/>
+    <xacro:generate_dock side="right"/>
+
+</robot>

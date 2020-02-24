@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="world_name" default="worlds/empty.world"/>
+    <arg name="gui" default="false"/>
+    <include file="$(find dockbot)/launch/world.launch">
+        <arg name="gui" value="$(arg gui)" />
+        <arg name="world_name" value="$(arg world_name)" />
+    </include>
+
+    <arg name="dock_x" default="1.0"/>
+    <arg name="dock_y" default="0.0"/>
+    <arg name="dock_YAW" default="0.0"/>
+
+    <!-- Load the URDF into the ROS Parameter Server -->
+    <!-- Converts XACRO to URDF at launch time and passes it -->
+    <!-- Manual conversion     rosrun xacro xacro model.xacro > model.urdf    -->
+    <param name="dock_description" command="$(find xacro)/xacro '$(find dockbot)/robots/dock.urdf.xacro'" />
+
+    <!-- Run a python script to the send a service call to gazebo_ros to spawn a URDF robot -->
+    <!-- <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-urdf -x $(arg x) -y $(arg y) -z $(arg z)  -model $(arg robot_name) -param robot_description"/> -->
+    <node name="dock_urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-urdf  -model dock -param dock_description -x $(arg dock_x) -y $(arg dock_y) -Y $(arg dock_YAW)"/>
+
+
+    <!-- <arg name="rvizconfig" default="$(find dockbot)/config/dockbot.rviz" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" /> -->
+
+
+    <!-- <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="30.0" />
+    </node> -->
+
+    <!-- <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher">
+        <param name="publish_frequency" type="double" value="30.0" />
+        <param name="use_gui" value="TRUE"/>
+    </node> -->
+
+</launch>
