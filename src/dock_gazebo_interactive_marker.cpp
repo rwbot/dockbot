@@ -68,8 +68,7 @@ void processFeedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr
   server->insert(im);
 
   std::ostringstream s;
-  s << "Feedback from marker '" << feedback->marker_name << "' "
-    << " / control '" << feedback->control_name << "'";
+  // s << "Feedback from marker '" << feedback->marker_name << "' " << " / control '" << feedback->control_name << "'";
 
   std::ostringstream mouse_point_ss;
   if (feedback->mouse_point_valid) {
@@ -103,13 +102,6 @@ void processFeedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr
                     << feedback->header.stamp.nsec << " nsec");
     break;
 
-  case visualization_msgs::InteractiveMarkerFeedback::MOUSE_DOWN:
-    ROS_INFO_STREAM(s.str() << ": mouse down" << mouse_point_ss.str() << ".");
-    break;
-
-  case visualization_msgs::InteractiveMarkerFeedback::MOUSE_UP:
-    ROS_INFO_STREAM(s.str() << ": mouse up" << mouse_point_ss.str() << ".");
-    break;
   }
 
   server->applyChanges();
@@ -129,8 +121,7 @@ void setGazeboPose( const visualization_msgs::InteractiveMarkerFeedbackConstPtr 
   setServiceMsg.request.model_state = dockModelState;
 
   if (ros::service::call(serviceName, setServiceMsg)) {
-    ROS_INFO_STREAM(
-        "SUCCESSFULLY SET POSE BY SERVICE CALL to gazebo/SetModelState");
+    // ROS_INFO_STREAM("SUCCESSFULLY SET POSE BY SERVICE CALL to gazebo/SetModelState");
     // ROS_INFO_STREAM("Dock pose: " << setServiceMsg.response);
   } else {
     ROS_WARN("FAILED TO SET POSE BY SERVICE CALL to gazebo/SetModelState");
@@ -233,14 +224,28 @@ int main(int argc, char **argv) {
   // make sure service is available before attempting to proceed, else node will crash
   bool getServiceReady, setServiceReady;
   getServiceReady = setServiceReady = false;
+  ros::WallTime start = ros::WallTime::now();
+
   while (!getServiceReady && !getServiceReady) {
     getServiceReady = ros::service::exists("/gazebo/get_model_state", true);
     setServiceReady = ros::service::exists("/gazebo/set_model_state", true);
     ROS_INFO_STREAM("waiting for set_model_state & get_model_state service");
     halfSec.sleep();
+    ros::WallTime end = ros::WallTime::now();
+    ros::WallDuration elapsed = end - start;
+    ROS_WARN_STREAM( " " << elapsed.toSec() << " seconds elapsed waiting for set_model_state & get_model_state services");
+    if ((ros::WallTime::now()-start).toSec() > 2.0)
+    {
+      ROS_WARN_STREAM("Timeout waiting for set_model_state & get_model_state services");
+      ROS_WARN_STREAM("Unable to find model");
+      break;
+    }
   }
 
-  ROS_INFO("set_model_state & get_model_state service exists");
+  if (getServiceReady && getServiceReady)
+  {
+    ROS_INFO("set_model_state & get_model_state service exists");
+  }
 
   geometry_msgs::Pose defaultPose, zeroPose;
   tf::Quaternion q(0.0, 0.0, 1.0, 1.0);
@@ -248,7 +253,6 @@ int main(int argc, char **argv) {
   tf::quaternionTFToMsg(q, defaultPose.orientation); // Specify Rotation Axis
   zeroPose = defaultPose;
   defaultPose.position.x = 1.0;
-  defaultPose.position.z = 0.1;
 
   geometry_msgs::Pose getPose;
   if (getGazeboPose(getPose)) 
@@ -259,6 +263,7 @@ int main(int argc, char **argv) {
   else
   {
     makeDockMarker(zeroPose);
+    ROS_INFO_STREAM("main: No Pose Specified - Setting Zero Gazebo Pose");
   }
   
   ros::Duration(0.1).sleep();
