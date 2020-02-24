@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+
+    <node name="dock_gazebo_interactive_marker" pkg="dockbot" type="dock_gazebo_interactive_marker" />
+
+</launch>
