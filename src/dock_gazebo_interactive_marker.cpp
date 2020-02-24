@@ -24,13 +24,13 @@ interactive_markers::MenuHandler menu_handler;
 std::string poseString(geometry_msgs::Pose pose) {
   // Convert Pose->Position to String
   std::ostringstream positionSS;
-  positionSS << std::fixed << std::setprecision(2) << "[ "<< pose.position.x << ",  " << pose.position.y << ",  " << pose.position.z << " ]\n";
+  positionSS << std::fixed << std::setprecision(2) << "[ "<< pose.position.x << ",  " << pose.position.y /*<< ",  " << pose.position.z*/ << " ] ";
 
   // Convert Pose->Orientation to String
   std::ostringstream quarternionSS;
-  quarternionSS << std::fixed << std::setprecision(2) << "[ "<< pose.orientation.x << ",  " << pose.orientation.y << ",  " << pose.orientation.z << ",  " << pose.orientation.w << " ]\n";
+  quarternionSS << std::fixed << std::setprecision(2) << "[ "<< pose.orientation.x << ",  " << pose.orientation.y << ",  " << pose.orientation.z << ",  " << pose.orientation.w << " ]";
 
-  // Extract Yaw from Quarternion 
+  // Extract Yaw from Quarternion
   tf::Pose tfPose;
   tf::poseMsgToTF(pose, tfPose);
   double yaw = tf::getYaw(tfPose.getRotation());
@@ -59,6 +59,7 @@ Marker makeBox(InteractiveMarker &msg, std_msgs::ColorRGBA rgba) {
 InteractiveMarkerControl &makeBoxControl(InteractiveMarker &msg, std_msgs::ColorRGBA rgba)
 {
   InteractiveMarkerControl control;
+  control.name = "Box Control";
   control.always_visible = true;
   control.markers.push_back(makeBox(msg, rgba));
   msg.controls.push_back(control);
@@ -108,7 +109,7 @@ void processFeedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr
 // %EndTag(processFeedback)%
 
 // %Tag(setGazeboPose)%
-void setGazeboPose( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback ) 
+void setGazeboPose( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
   geometry_msgs::Pose pose = feedback->pose;
   std::string serviceName = "/gazebo/set_model_state";
@@ -185,7 +186,7 @@ void makeDockMarker(geometry_msgs::Pose pose) {
   control.interaction_mode = InteractiveMarkerControl::MOVE_PLANE;
   // control.independent_marker_orientation = true;
   control.name = "TRANSLATE IN X-Y PLANE";
-  
+
 
   double positionValue = pose.position.x + pose.position.y;
   if (positionValue == 0) {
@@ -239,15 +240,10 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
   }
 
   makeBoxControl(im,color);
+  // Make Box Control XY Translation
+  im.controls[0].interaction_mode = InteractiveMarkerControl::MOVE_PLANE;
 
   InteractiveMarkerControl control;
-
-  // Send Translation
-  control.interaction_mode = InteractiveMarkerControl::MOVE_PLANE;
-  // control.independent_marker_orientation = true;
-  control.name = "TRANSLATE IN X-Y PLANE";
-  // control.always_visible = true;
-  im.controls.push_back(control);
 
   // Set Quarternion Aligned With Z Axis (Yes, the quarternion is confusing)
   tf::Quaternion orien(0.0, 1.0, 0.0, 1.0);
@@ -256,20 +252,15 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
   control.name = "ROTATE YAW";
   // Set Control To Rotate About Specified Axis
   control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
-  control.always_visible = true;
+  // control.always_visible = true;
   // Send Rotation
   im.controls.push_back(control);
-
-
 
   if (fixed6DoF)
   {
     tf::Quaternion orien(1.0, 0.0, 0.0, 1.0);
     orien.normalize();
     tf::quaternionTFToMsg(orien, control.orientation);
-    // control.name = "rotate_x";
-    // control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
-    // im.controls.push_back(control);
     control.name = "TRANSLATE X";
     control.interaction_mode = InteractiveMarkerControl::MOVE_AXIS;
     control.orientation_mode = InteractiveMarkerControl::FIXED;
@@ -278,9 +269,6 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
     orien = tf::Quaternion(0.0, 0.0, 1.0, 1.0);
     orien.normalize();
     tf::quaternionTFToMsg(orien, control.orientation);
-    // control.name = "rotate_y";
-    // control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
-    // im.controls.push_back(control);
     control.name = "TRANSLATE Y";
     control.interaction_mode = InteractiveMarkerControl::MOVE_AXIS;
     control.orientation_mode = InteractiveMarkerControl::FIXED;
@@ -301,7 +289,7 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
 // %EndTag(Dock)%
 
 // %Tag(Menu)%
-void makeMenuMarker(geometry_msgs::Pose pose) 
+void makeMenuMarker(geometry_msgs::Pose pose)
 {
   InteractiveMarker im;
   im.header.frame_id = "odom";
@@ -382,22 +370,18 @@ int main(int argc, char **argv) {
   poseDefault.position.x = 1.0;
 
   geometry_msgs::Pose getPose;
-  if (getGazeboPose(getPose)) 
+  if (getGazeboPose(getPose))
   {
-    // makeDockMarker(getPose);
     makeDockMarker(getPose,true);
     // makeMenuMarker(getPose);
     ROS_INFO_STREAM("dock_gazebo_interactive_marker: Pose Given - Setting Gazebo Pose");
   }
   else
   {
-    // makeDockMarker(poseZero);
     makeDockMarker(poseZero,true);
     // makeMenuMarker(poseZero);
     ROS_INFO_STREAM("dock_gazebo_interactive_marker: No Pose Specified - Setting Zero Gazebo Pose");
   }
-
-  
 
   ros::Duration(0.1).sleep();
 
