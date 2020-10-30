@@ -21,10 +21,12 @@ interactive_markers::MenuHandler menu_handler;
 // %EndTag(vars)%
 
 // %Tag(poseString)%
-std::string poseString(geometry_msgs::Pose pose) {
+std::string poseString(geometry_msgs::Pose pose, std::string label)
+{
   // Convert Pose->Position to String
   std::ostringstream positionSS;
-  positionSS << std::fixed << std::setprecision(2) << "[ "<< pose.position.x << ",  " << pose.position.y /*<< ",  " << pose.position.z*/ << " ] ";
+  positionSS << std::fixed << std::setprecision(2) << label << std::endl << "[ "<< pose.position.x << ",  " << pose.position.y << ",  " << pose.position.z << " ] ";
+  // positionSS << std::fixed << std::setprecision(2) << "[ "<< pose.position.x << ",  " << pose.position.y << " ] ";
 
   // Convert Pose->Orientation to String
   std::ostringstream quarternionSS;
@@ -53,7 +55,7 @@ Marker makeBox(InteractiveMarker &msg, std_msgs::ColorRGBA rgba) {
   marker.color.r = rgba.r;//0 .5;
   marker.color.g = rgba.g;//0.5;
   marker.color.b = rgba.b;//0.5;
-  marker.color.a = rgba.a;//1.0;
+  marker.color.a = 0.169;//rgba.a;//1.0;
   return marker;
 }
 InteractiveMarkerControl &makeBoxControl(InteractiveMarker &msg, std_msgs::ColorRGBA rgba)
@@ -68,17 +70,32 @@ InteractiveMarkerControl &makeBoxControl(InteractiveMarker &msg, std_msgs::Color
 }
 // %EndTag(Box)%
 
+bool resetGazebo() {
+  ROS_INFO_STREAM("resetGazebo() - CALLING SERVICE /gazebo/reset_world");
+  std::string serviceName = "/gazebo/reset_world";
+
+  gazebo_msgs::GetModelState getServiceMsg;
+  if (ros::service::call(serviceName, getServiceMsg))
+  {
+    ROS_INFO_STREAM("resetGazebo() - SUCCESSFUL CALL TO reset_world SERVICE");
+    return true;
+  } else {
+    ROS_WARN("resetGazebo() - FAILED TO RESET WORLD BY SERVICE CALL to /gazebo/reset_world ");
+    return false;
+  }
+}
+
 // %Tag(processFeedback)%
 void processFeedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
-
+  // ROS_INFO_STREAM("PROCESS FEEDBACK -- PROCESS FEEDBACK -- PROCESS FEEDBACK");
   InteractiveMarker im;
   server->get(feedback->marker_name,im);
-  std::string poseStr = poseString(feedback->pose);
+  std::string poseStr = poseString(feedback->pose, "GROUND TRUTH");
   im.description = poseStr;
   server->insert(im);
 
   std::ostringstream s;
-  // s << "Feedback from marker '" << feedback->marker_name << "' " << " / control '" << feedback->control_name << "'";
+  s << "Feedback from marker '" << feedback->marker_name << "' " << " / control '" << feedback->control_name << "'";
 
   std::ostringstream mouse_point_ss;
   if (feedback->mouse_point_valid) {
@@ -95,13 +112,24 @@ void processFeedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr
   case visualization_msgs::InteractiveMarkerFeedback::MENU_SELECT:
     ROS_INFO_STREAM(s.str() << ": menu item " << feedback->menu_entry_id
                             << " clicked" << mouse_point_ss.str() << ".");
-    // make
+    switch (feedback->menu_entry_id){
+      case(0):
+        resetGazebo();
+        break;
+    }
     break;
 
   case visualization_msgs::InteractiveMarkerFeedback::POSE_UPDATE:
-    ROS_INFO_STREAM(poseStr);
+    // ROS_INFO_STREAM(s.str() << std::endl << poseStr);
     break;
 
+  case visualization_msgs::InteractiveMarkerFeedback::MOUSE_DOWN:
+    // ROS_INFO_STREAM(s.str() << ": mouse down" << mouse_point_ss.str() << ".");
+    break;
+
+  case visualization_msgs::InteractiveMarkerFeedback::MOUSE_UP:
+    // ROS_INFO_STREAM(s.str() << ": mouse up" << mouse_point_ss.str() << ".");
+    break;
   }
 
   server->applyChanges();
@@ -111,6 +139,7 @@ void processFeedback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr
 // %Tag(setGazeboPose)%
 void setGazeboPose( const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback )
 {
+  // ROS_INFO_STREAM("setGazeboPose: ATTEMPTING TO SET POSE BY SERVICE CALL to gazebo/SetModelState");
   geometry_msgs::Pose pose = feedback->pose;
   std::string serviceName = "/gazebo/set_model_state";
 
@@ -122,95 +151,96 @@ void setGazeboPose( const visualization_msgs::InteractiveMarkerFeedbackConstPtr 
   setServiceMsg.request.model_state = dockModelState;
 
   if (ros::service::call(serviceName, setServiceMsg)) {
-    // ROS_INFO_STREAM("SUCCESSFULLY SET POSE BY SERVICE CALL to gazebo/SetModelState");
-    // ROS_INFO_STREAM("Dock pose: " << setServiceMsg.response);
+    // ROS_INFO_STREAM("setGazeboPose: SUCCESSFULLY SET POSE BY SERVICE CALL to gazebo/SetModelState");
+    // ROS_INFO_STREAM("setGazeboPose: Dock pose: " << pose);
+    // ROS_INFO("setGazeboPose: APPLYING CHANGES");
+    InteractiveMarker im;
+    server->get(feedback->marker_name, im);
+    std::string poseStr = poseString(feedback->pose, "GROUND TRUTH");
+    im.description = poseStr;
+    server->insert(im);
+    server->applyChanges();
   } else {
-    ROS_WARN("FAILED TO SET POSE BY SERVICE CALL to gazebo/SetModelState");
+    ROS_WARN("setGazeboPose() FAILED TO SET POSE BY SERVICE CALL to gazebo/SetModelState");
   }
+
 }
 // %EndTag(setGazeboPose)%
 
 
-// %Tag(getGazeboPose)%
 bool getGazeboPose(geometry_msgs::Pose &pose) {
 
-  ROS_INFO_STREAM("CALLING SERVICE gazebo/GetModelState");
+  ROS_INFO_STREAM("getGazeboPose() - CALLING SERVICE gazebo/GetModelState");
   std::string serviceName = "/gazebo/get_model_state";
 
   gazebo_msgs::GetModelState getServiceMsg;
   getServiceMsg.request.model_name = "dock";
   if (ros::service::call(serviceName, getServiceMsg))
   {
-    ROS_INFO_STREAM("SUCCESSFUL CALL TO GetModelState SERVICE");
-    ROS_INFO_STREAM("Dock pose: " << getServiceMsg.response.pose);
+    ROS_INFO_STREAM("getGazeboPose() - SUCCESSFUL CALL TO GetModelState SERVICE");
+    ROS_INFO_STREAM("getGazeboPose() - Dock pose: " << getServiceMsg.response.pose);
     pose = getServiceMsg.response.pose;
     return true;
   } else {
-    ROS_WARN("FAILED TO GET POSE BY SERVICE CALL to gazebo/GetModelState ");
+    ROS_WARN("getGazeboPose() - FAILED TO GET POSE BY SERVICE CALL to gazebo/GetModelState ");
     return false;
   }
 }
-// %EndTag(getGazeboPose)%
+
+// %Tag(alignMarker)%
+void alignMarker(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
+{
+  ROS_INFO(" alignMarker- ");
+  geometry_msgs::Pose pose = feedback->pose;
+
+  pose.position.x = round(pose.position.x - 0.5) + 0.5;
+  pose.position.y = round(pose.position.y - 0.5) + 0.5;
+
+  ROS_INFO_STREAM(feedback->marker_name << ":"
+                                        << " aligning position = "
+                                        << feedback->pose.position.x
+                                        << ", " << feedback->pose.position.y
+                                        << ", " << feedback->pose.position.z
+                                        << " to "
+                                        << pose.position.x
+                                        << ", " << pose.position.y
+                                        << ", " << pose.position.z);
+
+  server->setPose(feedback->marker_name, pose);
+  server->applyChanges();
+}
+// %EndTag(alignMarker)%
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-// %Tag(Dock)%
-void makeDockMarker(geometry_msgs::Pose pose) {
-  std_msgs::ColorRGBA green, red;
+// %Tag(Menu)%
+void makeMenuMarker(geometry_msgs::Pose pose)
+{
+  std_msgs::ColorRGBA green, red, color;
   green.a = red.a = green.g = red.r = 1.0;
   InteractiveMarker im;
-  im.header.frame_id = "odom";
+  im.header.frame_id = "base_link";
   im.pose = pose;
   im.scale = 0.6;
 
-  im.name = "dock";
-  im.description = poseString(pose);
+  im.name = "context_menu";
+  im.description = "Context Menu\n(Right Click)";
 
   InteractiveMarkerControl control;
 
+  control.interaction_mode = InteractiveMarkerControl::MENU;
+  control.name = "menu_only_control";
 
-
-  // Set Quarternion Aligned With Z Axis (Yes, the quarternion is confusing)
-  tf::Quaternion orien(0.0, 1.0, 0.0, 1.0);
-  orien.normalize();
-  tf::quaternionTFToMsg(orien, control.orientation); // Specify Rotation Axis
-  control.name = "ROTATE YAW";
-  // Set Control To Rotate About Specified Axis
-  control.interaction_mode = InteractiveMarkerControl::ROTATE_AXIS;
-  // Send Rotation
-  im.controls.push_back(control);
-
-
-
-  // Send Translation
-  control.interaction_mode = InteractiveMarkerControl::MOVE_PLANE;
-  // control.independent_marker_orientation = true;
-  control.name = "TRANSLATE IN X-Y PLANE";
-
-
-  double positionValue = pose.position.x + pose.position.y;
-  if (positionValue == 0) {
-    // make a box which also moves in the plane
-    ROS_WARN_STREAM("makeDockMarker: Zero Pose - Creating Zero Marker");
-    control.markers.push_back(makeBox(im, red));
-  } else {
-    // make a box which also moves in the plane
-    ROS_INFO_STREAM("makeDockMarker: Pose Given - Creating Green Marker");
-    control.markers.push_back(makeBox(im, green));
-  }
-
+  Marker marker = makeBox(im,color);
+  control.markers.push_back(marker);
   control.always_visible = true;
   im.controls.push_back(control);
 
-  // we want to use our special callback function
   server->insert(im);
   server->setCallback(im.name, &processFeedback);
-
-  // Callback to update Gazebo pose
-  // set different callback for POSE_UPDATE feedback
-  server->setCallback(im.name, &setGazeboPose, visualization_msgs::InteractiveMarkerFeedback::POSE_UPDATE);
+  menu_handler.apply(*server, im.name);
 }
-// %EndTag(Dock)%
+// %EndTag(Menu)%
 
 // %Tag(Dock)%
 void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
@@ -223,24 +253,24 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
   im.scale = 0.6;
 
   im.name = "dock";
-  im.description = poseString(pose);
+  im.description = poseString(pose, "GROUND TRUTH");
 
   double positionValue = pose.position.x + pose.position.y;
   if (positionValue == 0)
   {
     // make a box which also moves in the plane
-    ROS_WARN_STREAM("makeDockMarker: Zero Pose - Creating Red Zero Marker");
+    ROS_WARN_STREAM(" makeDockMarker- Zero Pose - Creating Red Zero Marker");
     color = red;
   }
   else
   {
     // make a box which also moves in the plane
-    ROS_INFO_STREAM("makeDockMarker: Pose Given - Creating Green Pose Marker");
+    ROS_INFO_STREAM(" makeDockMarker- Pose Given - Creating Green Pose Marker");
     color = green;
   }
 
   makeBoxControl(im,color);
-  // Make Box Control XY Translation
+  // Make Box Control in Plane Translation
   im.controls[0].interaction_mode = InteractiveMarkerControl::MOVE_PLANE;
 
   InteractiveMarkerControl control;
@@ -255,6 +285,10 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
   // control.always_visible = true;
   // Send Rotation
   im.controls.push_back(control);
+
+  // Set Orientation of Box Control Plane for XY Translation
+  im.controls[0].orientation = control.orientation;
+
 
   if (fixed6DoF)
   {
@@ -285,42 +319,10 @@ void makeDockMarker(geometry_msgs::Pose pose, bool fixed6DoF = false)
   // Callback to update Gazebo pose
   // set different callback for POSE_UPDATE feedback
   server->setCallback(im.name, &setGazeboPose, visualization_msgs::InteractiveMarkerFeedback::POSE_UPDATE);
+
+  
 }
 // %EndTag(Dock)%
-
-// %Tag(Menu)%
-void makeMenuMarker(geometry_msgs::Pose pose)
-{
-  InteractiveMarker im;
-  im.header.frame_id = "odom";
-  im.pose.position = pose.position;
-  im.scale = 0.6;
-
-  im.name = "Dock Menu";
-  im.description = "Dock Menu\n(Right Click)";
-
-  InteractiveMarkerControl control;
-
-  control.interaction_mode = InteractiveMarkerControl::MENU;
-  control.name = "Dock Menu Control";
-
-  std_msgs::ColorRGBA color;
-  color.a = color.b = 0.5;
-  Marker marker = makeBox(im, color);
-  control.markers.push_back(marker);
-  control.always_visible = true;
-  im.controls.push_back(control);
-
-  server->insert(im);
-  server->setCallback(im.name, &processFeedback);
-
-  // Callback to update Gazebo pose
-  // set different callback for POSE_UPDATE feedbackS
-  server->setCallback(im.name, &setGazeboPose, visualization_msgs::InteractiveMarkerFeedback::POSE_UPDATE);
-
-  menu_handler.apply(*server, im.name);
-}
-// %EndTag(Menu)%
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -332,9 +334,9 @@ int main(int argc, char **argv) {
 
   server.reset(new interactive_markers::InteractiveMarkerServer("dock_interactive_marker", "", false));
 
-  menu_handler.insert("(1,  0,0)", &processFeedback);
-  menu_handler.insert("(1,0.5,0)", &processFeedback);
-  menu_handler.insert("(1,  1,0)", &processFeedback);
+  // menu_handler.insert("Reset World", &processFeedback);
+  // menu_handler.insert("(1,0.5,0)", &processFeedback);
+  // menu_handler.insert("(1,  1,0)", &processFeedback);
 
   // make sure service is available before attempting to proceed, else node will crash
   bool getServiceReady, setServiceReady;
@@ -344,22 +346,22 @@ int main(int argc, char **argv) {
   while (!getServiceReady && !getServiceReady) {
     getServiceReady = ros::service::exists("/gazebo/get_model_state", true);
     setServiceReady = ros::service::exists("/gazebo/set_model_state", true);
-    ROS_INFO_STREAM("dock_gazebo_interactive_marker: waiting for set_model_state & get_model_state service");
+    ROS_INFO_STREAM(" waiting for set_model_state & get_model_state service");
     halfSec.sleep();
     ros::WallTime end = ros::WallTime::now();
     ros::WallDuration elapsed = end - start;
     ROS_WARN_STREAM( "dock_gazebo_interactive_marker " << elapsed.toSec() << " seconds elapsed waiting for set_model_state & get_model_state services");
     if ((ros::WallTime::now()-start).toSec() > 5.0)
     {
-      ROS_WARN_STREAM("dock_gazebo_interactive_marker: Timeout waiting for set_model_state & get_model_state services");
-      ROS_WARN_STREAM("dock_gazebo_interactive_marker: Unable to find model");
+      ROS_WARN_STREAM(" Timeout waiting for set_model_state & get_model_state services");
+      ROS_WARN_STREAM(" Unable to find model");
       break;
     }
   }
 
   if (getServiceReady && getServiceReady)
   {
-    ROS_INFO("dock_gazebo_interactive_marker: set_model_state & get_model_state service exists");
+    ROS_INFO(" set_model_state & get_model_state service exists");
   }
 
   geometry_msgs::Pose poseDefault, poseZero, poseX1Y1, poseX1Yp5;
@@ -374,22 +376,24 @@ int main(int argc, char **argv) {
   {
     makeDockMarker(getPose,true);
     // makeMenuMarker(getPose);
-    ROS_INFO_STREAM("dock_gazebo_interactive_marker: Pose Given - Setting Gazebo Pose");
+    ROS_INFO_STREAM(" Pose Given - Setting Gazebo Pose");
   }
   else
   {
     makeDockMarker(poseZero,true);
     // makeMenuMarker(poseZero);
-    ROS_INFO_STREAM("dock_gazebo_interactive_marker: No Pose Specified - Setting Zero Gazebo Pose");
+    ROS_INFO_STREAM(" No Pose Specified - Setting Zero Gazebo Pose");
   }
 
   ros::Duration(0.1).sleep();
 
-  ROS_INFO_STREAM("main: applying changes to interactive marker server");
+  ROS_INFO_STREAM(" main- applying changes to interactive marker server");
   server->applyChanges();
 
+  ROS_INFO_STREAM(" main- ros::spin()");
   ros::spin();
 
+  ROS_INFO_STREAM(" main- reseting interactive marker server");
   server.reset();
 }
 // %EndTag(main)%
